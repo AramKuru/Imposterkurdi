@@ -22,25 +22,15 @@ export default function ShowWordPage() {
   const currentPlayer = game.players[game.currentPlayerIndex];
   const isImposter = currentPlayer.id === game.imposterId;
   const total = game.players.length;
-  const progress = game.currentPlayerIndex + 1;
 
-  function handleReveal() {
-    setRevealed(true);
-  }
-
-  function handleHide() {
-    setRevealed(false);
-    setDone(true);
-  }
+  function handleReveal() { setRevealed(true); }
+  function handleHide() { setRevealed(false); setDone(true); }
 
   function handleNext() {
     if (!game) return;
     const nextIndex = game.currentPlayerIndex + 1;
-
     if (nextIndex >= game.players.length) {
-      // All players have seen their word
-      const updated: GameState = { ...game, phase: 'discussion', currentPlayerIndex: 0 };
-      saveGame(updated);
+      saveGame({ ...game, phase: 'discussion', currentPlayerIndex: 0 });
       router.push('/discuss');
     } else {
       const updated: GameState = {
@@ -56,88 +46,98 @@ export default function ShowWordPage() {
   }
 
   return (
-    <main className="flex flex-col items-center justify-center min-h-screen px-4">
-      <div className="w-full max-w-sm text-center">
-        {/* Progress */}
-        <p className="text-white/40 text-sm mb-6">
-          یاریزان {progress} لە {total}
+    <div className="flex flex-col min-h-dvh" style={{ background: '#0f0a1e' }}>
+      {/* Progress bar */}
+      <div className="h-1 w-full" style={{ background: 'rgba(255,255,255,0.06)' }}>
+        <div
+          className="h-full transition-all duration-300"
+          style={{
+            width: `${((game.currentPlayerIndex) / total) * 100}%`,
+            background: 'linear-gradient(90deg, #7c3aed, #4f46e5)',
+          }}
+        />
+      </div>
+
+      <div className="flex-1 flex flex-col items-center justify-center px-5 py-8">
+        {/* Step indicator */}
+        <p className="text-white/35 text-sm mb-8 tracking-wide">
+          {game.currentPlayerIndex + 1} / {total}
         </p>
 
         {/* Player name */}
-        <div className="mb-8">
-          <p className="text-white/60 text-lg mb-1">ئێستا دووری</p>
-          <h2 className="text-4xl font-black text-purple-300">{currentPlayer.name}</h2>
+        <div className="text-center mb-10">
+          <p className="text-white/50 text-lg mb-1">دووری</p>
+          <h2 className="text-5xl font-black text-white">{currentPlayer.name}</h2>
         </div>
 
+        {/* ── Not yet revealed ── */}
         {!revealed && !done && (
-          <>
+          <div className="w-full max-w-sm flex flex-col items-center gap-6">
             <div
-              className="rounded-2xl p-8 mb-8"
-              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
+              className="w-full rounded-2xl p-6 text-center"
+              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
             >
-              <p className="text-white/60 text-base leading-relaxed">
-                مۆبایلەکە بگرە و دووگمەی خوارەوە دابگرە بۆ دیتنی پەیامەکەت
+              <div className="text-4xl mb-3">🤫</div>
+              <p className="text-white/55 text-base leading-relaxed">
+                مۆبایلەکە بگرە، دوورگرەوە لە کەسانی تر، دوگمەی خوارەوە دابگرە
               </p>
-              <p className="text-white/40 text-sm mt-2">هیچ کەسی تر نەبینێتەوە</p>
             </div>
             <button
               onPointerDown={handleReveal}
-              className="w-full text-white font-black text-2xl py-6 rounded-2xl transition-all active:scale-95 shadow-xl"
+              className="w-full text-white font-black text-xl py-6 rounded-2xl active:scale-95 transition-all shadow-xl"
               style={{ background: 'linear-gradient(135deg, #7c3aed, #4f46e5)' }}
             >
               👁️ پەیامەکەم ببینم
             </button>
-          </>
+          </div>
         )}
 
+        {/* ── Revealed ── */}
         {revealed && !done && (
-          <>
+          <div className="w-full max-w-sm flex flex-col items-center gap-5">
             <div
-              className="rounded-2xl p-8 mb-8 text-center"
+              className="w-full rounded-2xl p-7 text-center"
               style={{
-                background: isImposter
-                  ? 'rgba(220,38,38,0.15)'
-                  : 'rgba(22,163,74,0.15)',
-                border: isImposter
-                  ? '2px solid rgba(220,38,38,0.5)'
-                  : '2px solid rgba(22,163,74,0.5)',
+                background: isImposter ? 'rgba(220,38,38,0.12)' : 'rgba(22,163,74,0.12)',
+                border: isImposter ? '2px solid rgba(220,38,38,0.45)' : '2px solid rgba(22,163,74,0.45)',
               }}
             >
               {isImposter ? (
                 <>
                   <div className="text-5xl mb-3">🎭</div>
-                  <p className="text-red-400 font-bold text-lg mb-1">تۆ ئیمپۆستەریت!</p>
-                  <p className="text-white/50 text-sm mb-3">بەکتی پەیامەکە:</p>
+                  <p className="text-red-400 font-bold text-lg mb-4">تۆ ئیمپۆستەریت!</p>
+                  <p className="text-white/40 text-sm mb-2">تەنیا بەکت دەزانیت:</p>
                   <p className="text-yellow-300 font-black text-4xl">{game.categoryName}</p>
-                  <p className="text-white/40 text-sm mt-3">خۆت بشارێتەوە — پەیامەکە نازانیت</p>
+                  <p className="text-white/35 text-sm mt-4">پەیامی ڕاستەقینە نازانیت — خۆت بشارێتەوە</p>
                 </>
               ) : (
                 <>
                   <div className="text-5xl mb-3">🔑</div>
-                  <p className="text-green-400 font-bold text-lg mb-1">پەیامەکەت:</p>
-                  <p className="text-white font-black text-5xl mt-2">{game.word}</p>
-                  <p className="text-white/40 text-sm mt-3">بەکت: {game.categoryName}</p>
+                  <p className="text-green-400 font-bold text-lg mb-4">پەیامەکەت:</p>
+                  <p className="text-white font-black text-5xl leading-tight">{game.word}</p>
+                  <p className="text-white/35 text-sm mt-4">بەکت: {game.categoryName}</p>
                 </>
               )}
             </div>
             <button
               onClick={handleHide}
-              className="w-full text-white font-black text-xl py-5 rounded-2xl transition-all active:scale-95"
-              style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)' }}
+              className="w-full text-white/80 font-bold text-lg py-5 rounded-2xl active:scale-95 transition-all"
+              style={{ background: 'rgba(255,255,255,0.09)', border: '1px solid rgba(255,255,255,0.15)' }}
             >
               ✅ تێگەیشتم، داخستن
             </button>
-          </>
+          </div>
         )}
 
+        {/* ── Done, pass phone ── */}
         {done && (
-          <>
+          <div className="w-full max-w-sm flex flex-col items-center gap-5">
             <div
-              className="rounded-2xl p-6 mb-8"
-              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
+              className="w-full rounded-2xl p-6 text-center"
+              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
             >
-              <div className="text-4xl mb-2">👍</div>
-              <p className="text-white/70 text-lg">
+              <div className="text-4xl mb-2">📱</div>
+              <p className="text-white/65 text-lg leading-relaxed">
                 {game.currentPlayerIndex + 1 < total
                   ? 'مۆبایلەکە بدە بە یاریزانی داهاتوو'
                   : 'هەموو یاریزانان پەیامیان بینی!'}
@@ -145,14 +145,14 @@ export default function ShowWordPage() {
             </div>
             <button
               onClick={handleNext}
-              className="w-full text-white font-black text-2xl py-5 rounded-2xl transition-all active:scale-95 shadow-lg"
+              className="w-full text-white font-black text-xl py-6 rounded-2xl active:scale-95 transition-all shadow-lg"
               style={{ background: 'linear-gradient(135deg, #7c3aed, #4f46e5)' }}
             >
               {game.currentPlayerIndex + 1 < total ? '➡️ یاریزانی داهاتوو' : '🗣️ دەستپێکردنی باس'}
             </button>
-          </>
+          </div>
         )}
       </div>
-    </main>
+    </div>
   );
 }

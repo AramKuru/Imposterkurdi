@@ -5,6 +5,34 @@ import { categories, getRandomWordFromCategories } from './words';
 
 const GAME_KEY = 'imposter_game_state';
 const PLAYERS_KEY = 'imposter_players';
+const SETTINGS_KEY = 'imposter_settings';
+
+export interface GameSettings {
+  selectedCategories: string[];
+  discussionTime: number;
+}
+
+const DEFAULT_SETTINGS: GameSettings = {
+  selectedCategories: [], // empty = all categories
+  discussionTime: 180,
+};
+
+export function saveSettings(settings: GameSettings): void {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  }
+}
+
+export function loadSettings(): GameSettings {
+  if (typeof window === 'undefined') return DEFAULT_SETTINGS;
+  const raw = localStorage.getItem(SETTINGS_KEY);
+  if (!raw) return DEFAULT_SETTINGS;
+  try {
+    return { ...DEFAULT_SETTINGS, ...(JSON.parse(raw) as Partial<GameSettings>) };
+  } catch {
+    return DEFAULT_SETTINGS;
+  }
+}
 
 // ── Per-round game state ──────────────────────────────────────────────────────
 
