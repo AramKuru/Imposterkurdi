@@ -1,6 +1,7 @@
 export interface Player {
   id: string;
   name: string;
+  score: number;
 }
 
 export type GamePhase =
@@ -23,4 +24,5 @@ export interface GameState {
   discussionTime: number; // seconds
   selectedCategories: string[];
   revealedPlayers: string[]; // player ids who already saw their word
+  scoreDeltas: Record<string, number>; // populated after voting, playerId -> delta
 }
