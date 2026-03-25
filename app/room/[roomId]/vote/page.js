@@ -1,80 +1,77 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { loadState, submitVote, finishVote } from '../../lib/game'
+import { useRouter, useParams } from 'next/navigation'
+import { getRoom, submitVote, finishVoting } from '../../../../lib/room'
 
 export default function Vote() {
   const router = useRouter()
-  const [state, setState] = useState(null)
-  // voterIndex: which player is currently voting
+  const { roomId } = useParams()
+  const [room, setRoom] = useState(null)
   const [voterIndex, setVoterIndex] = useState(0)
-  // selectedSuspect: name of suspect the current voter chose
   const [selected, setSelected] = useState(null)
-  const [phase, setPhase] = useState('pick') // pick | confirm
 
   useEffect(() => {
-    const s = loadState()
-    if (!s) { router.replace('/'); return }
-    if (s.phase !== 'vote') {
-      if (s.phase === 'discuss') router.replace('/discuss')
-      else if (s.phase === 'results') router.replace('/results')
-      else if (s.phase === 'reveal') router.replace('/reveal')
+    if (!roomId) return
+    const r = getRoom(roomId)
+    if (!r) { router.replace('/'); return }
+    if (r.round?.phase !== 'vote') {
+      redirectToPhase(router, roomId, r.round?.phase ?? r.status)
       return
     }
-    setState(s)
-  }, [router])
+    setRoom(r)
+  }, [roomId, router])
 
-  if (!state) return <LoadingScreen />
+  if (!room?.round) return <LoadingScreen />
 
-  const voter = state.players[voterIndex]
-  const suspects = state.players.filter((_, i) => i !== voterIndex)
-  const votesLeft = state.players.length - Object.keys(state.votes).length
-  const progress = Object.keys(state.votes).length / state.players.length
+  const { players, round } = room
+  const voter = players[voterIndex]
+  const suspects = players.filter((_, i) => i !== voterIndex)
+  const voteCount = Object.keys(round.votes).length
+  const progress = voteCount / players.length
+  const isLast = voterIndex === players.length - 1
 
   const confirmVote = () => {
     if (!selected) return
-    const next = submitVote(state, voter, selected)
-    setState(next)
+    const next = submitVote(roomId, voter, selected)
+    setRoom(next)
 
-    const nextVoterIndex = voterIndex + 1
-    if (nextVoterIndex >= state.players.length) {
-      // All voted
-      const final = finishVote(next)
-      setState(final)
-      router.push('/results')
+    if (isLast) {
+      const final = finishVoting(roomId)
+      setRoom(final)
+      router.push(`/room/${roomId}/results`)
     } else {
-      setVoterIndex(nextVoterIndex)
+      setVoterIndex(voterIndex + 1)
       setSelected(null)
-      setPhase('pick')
     }
   }
 
   return (
     <main className="min-h-screen flex flex-col items-center justify-between px-4 py-10">
-      {/* Header */}
       <div className="w-full max-w-sm text-center">
-        <h1 className="text-2xl font-black text-white mb-1">🗳️ دەنگدان</h1>
-        <div className="w-full bg-white/5 rounded-full h-1.5 mt-3">
+        <div className="flex justify-between text-xs text-white/30 mb-2">
+          <span>ژووری {roomId}</span>
+          <span>دۆرە {room.currentRound}/{room.totalRounds}</span>
+        </div>
+        <h1 className="text-2xl font-black text-white mb-3">🗳️ دەنگدان</h1>
+        <div className="w-full bg-white/5 rounded-full h-1.5">
           <div
             className="bg-purple-500 h-1.5 rounded-full transition-all duration-500"
             style={{ width: `${progress * 100}%` }}
           />
         </div>
-        <p className="text-white/40 text-xs mt-2">
-          {Object.keys(state.votes).length} / {state.players.length} دەنگیان دا
-        </p>
+        <p className="text-white/30 text-xs mt-2">{voteCount}/{players.length} دەنگیان دا</p>
       </div>
 
-      {/* Current voter */}
-      <div className="flex-1 flex flex-col items-center justify-center gap-6 w-full max-w-sm">
-        <div className="text-center game-card p-6 w-full">
+      <div className="flex-1 flex flex-col items-center justify-center gap-5 w-full max-w-sm">
+        {/* Current voter */}
+        <div className="game-card p-5 w-full text-center">
           <div className="text-4xl mb-2">🙋</div>
           <p className="text-white/40 text-sm mb-1">ئێستا نۆبەتی</p>
           <p className="text-2xl font-black text-white">{voter}</p>
           <p className="text-white/40 text-sm mt-2">کێی بۆ ئیمپۆستەر دادەنێیت؟</p>
         </div>
 
-        {/* Suspect list */}
+        {/* Suspects */}
         <div className="w-full flex flex-col gap-3">
           {suspects.map((suspect) => (
             <button
@@ -85,20 +82,19 @@ export default function Vote() {
                           ${selected === suspect ? 'selected' : ''}`}
             >
               <span className="text-white font-bold text-lg">{suspect}</span>
-              <span className={`text-2xl transition-transform duration-150 ${selected === suspect ? 'scale-125' : 'scale-100'}`}>
+              <span className={`text-2xl transition-transform duration-150 ${selected === suspect ? 'scale-125' : ''}`}>
                 {selected === suspect ? '🎯' : '○'}
               </span>
             </button>
           ))}
         </div>
 
-        {/* Confirm */}
         <button
           onClick={confirmVote}
           disabled={!selected}
           className="w-full btn-primary py-5 text-xl rounded-2xl disabled:opacity-30 disabled:cursor-not-allowed"
         >
-          {voterIndex === state.players.length - 1
+          {isLast
             ? `✅ دەنگ بدە بۆ ${selected ?? '...'} — ئەنجام ببینە`
             : `✅ دەنگ بدە بۆ ${selected ?? '...'}`}
         </button>
@@ -107,6 +103,13 @@ export default function Vote() {
       <div className="h-4" />
     </main>
   )
+}
+
+function redirectToPhase(router, roomId, phase) {
+  if (phase === 'reveal') router.replace(`/room/${roomId}/reveal`)
+  else if (phase === 'discuss') router.replace(`/room/${roomId}/discuss`)
+  else if (phase === 'results') router.replace(`/room/${roomId}/results`)
+  else router.replace(`/room/${roomId}`)
 }
 
 function LoadingScreen() {

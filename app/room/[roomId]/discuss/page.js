@@ -1,53 +1,48 @@
 'use client'
 import { useEffect, useState, useRef } from 'react'
-import { useRouter } from 'next/navigation'
-import { loadState, startVote } from '../../lib/game'
+import { useRouter, useParams } from 'next/navigation'
+import { getRoom, startVote } from '../../../../lib/room'
 
-const DISCUSS_SECONDS = 180 // 3 minutes default
+const DISCUSS_SECONDS = 180
 
 export default function Discuss() {
   const router = useRouter()
-  const [state, setState] = useState(null)
+  const { roomId } = useParams()
+  const [room, setRoom] = useState(null)
   const [seconds, setSeconds] = useState(DISCUSS_SECONDS)
   const [running, setRunning] = useState(true)
   const intervalRef = useRef(null)
 
   useEffect(() => {
-    const s = loadState()
-    if (!s) { router.replace('/'); return }
-    if (s.phase !== 'discuss') {
-      if (s.phase === 'vote') router.replace('/vote')
-      else if (s.phase === 'results') router.replace('/results')
-      else if (s.phase === 'reveal') router.replace('/reveal')
+    if (!roomId) return
+    const r = getRoom(roomId)
+    if (!r) { router.replace('/'); return }
+    if (r.round?.phase !== 'discuss') {
+      redirectToPhase(router, roomId, r.round?.phase ?? r.status)
       return
     }
-    setState(s)
-  }, [router])
+    setRoom(r)
+  }, [roomId, router])
 
   useEffect(() => {
     if (!running) return
     intervalRef.current = setInterval(() => {
       setSeconds((s) => {
-        if (s <= 1) {
-          clearInterval(intervalRef.current)
-          setRunning(false)
-          return 0
-        }
+        if (s <= 1) { clearInterval(intervalRef.current); setRunning(false); return 0 }
         return s - 1
       })
     }, 1000)
     return () => clearInterval(intervalRef.current)
   }, [running])
 
-  const goToVote = () => {
-    if (!state) return
+  const goVote = () => {
+    if (!room) return
     clearInterval(intervalRef.current)
-    const next = startVote(state)
-    setState(next)
-    router.push('/vote')
+    startVote(roomId)
+    router.push(`/room/${roomId}/vote`)
   }
 
-  if (!state) return <LoadingScreen />
+  if (!room?.round) return <LoadingScreen />
 
   const mins = Math.floor(seconds / 60)
   const secs = seconds % 60
@@ -56,13 +51,15 @@ export default function Discuss() {
 
   return (
     <main className="min-h-screen flex flex-col items-center justify-between px-4 py-10">
-      {/* Header */}
       <div className="w-full max-w-sm text-center">
-        <h1 className="text-2xl font-black text-white mb-1">وادە باس</h1>
+        <div className="flex justify-between text-xs text-white/30 mb-2">
+          <span>ژووری {roomId}</span>
+          <span>دۆرە {room.currentRound}/{room.totalRounds}</span>
+        </div>
+        <h1 className="text-2xl font-black text-white mb-1">وادەی باس</h1>
         <p className="text-white/40 text-sm">ئیمپۆستەرەکە بدۆزەوە!</p>
       </div>
 
-      {/* Timer */}
       <div className="flex-1 flex flex-col items-center justify-center gap-8 w-full max-w-sm">
         {/* Circular timer */}
         <div className="relative flex items-center justify-center" style={{ width: 200, height: 200 }}>
@@ -89,49 +86,43 @@ export default function Discuss() {
           </div>
         </div>
 
-        {/* Pause / Resume */}
         <div className="flex gap-3 w-full">
-          <button
-            onClick={() => setRunning((r) => !r)}
-            className="btn-secondary flex-1 py-3"
-          >
+          <button onClick={() => setRunning((r) => !r)} className="btn-secondary flex-1 py-3">
             {running ? '⏸️ وەستان' : '▶️ بەردەوامبوون'}
           </button>
-          <button
-            onClick={() => { setSeconds(DISCUSS_SECONDS); setRunning(true) }}
-            className="btn-secondary py-3 px-4"
-          >
+          <button onClick={() => { setSeconds(DISCUSS_SECONDS); setRunning(true) }} className="btn-secondary py-3 px-4">
             🔄
           </button>
         </div>
 
-        {/* Tips */}
         <div className="game-card p-5 w-full">
           <p className="text-white/60 text-sm font-bold mb-3">🧠 ئامۆژگاری باس</p>
           <ul className="flex flex-col gap-2 text-white/50 text-sm">
             <li>• وشەکە ڕاستەوخۆ مەگۆیە</li>
             <li>• پرسیاری نیشانەدار بکە</li>
-            <li>• بگەڕێ بۆ وەڵامی کەسانی دیکە</li>
-            <li>• ئیمپۆستەر دووچار ئەبێت شوێن بکاتەوە</li>
+            <li>• وەڵامی یارمەتیدەرانی دیکە بگەڕێ</li>
+            <li>• ئیمپۆستەر شوێن دەکاتەوە — شیاوی بنە</li>
           </ul>
         </div>
 
-        {/* Players */}
-        <div className="w-full">
-          <p className="text-white/40 text-xs mb-2 text-center">یارمەتیدەران</p>
-          <div className="flex flex-wrap justify-center gap-2">
-            {state.players.map((p, i) => (
-              <span key={i} className="bg-white/5 border border-white/10 rounded-full px-3 py-1 text-sm text-white/70">
-                {p}
-              </span>
-            ))}
+        {/* Mini leaderboard */}
+        <div className="w-full game-card p-4">
+          <p className="text-white/40 text-xs mb-3 font-bold">🏆 نمرەی ئێستا</p>
+          <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+            {Object.entries(room.leaderboard)
+              .sort(([, a], [, b]) => b - a)
+              .map(([name, score]) => (
+                <div key={name} className="flex items-center gap-1.5 text-sm">
+                  <span className="text-white/60">{name}</span>
+                  <span className="text-purple-300 font-bold">{score}</span>
+                </div>
+              ))}
           </div>
         </div>
       </div>
 
-      {/* Vote button */}
       <div className="w-full max-w-sm">
-        <button onClick={goToVote} className="btn-primary w-full py-5 text-xl rounded-2xl">
+        <button onClick={goVote} className="btn-primary w-full py-5 text-xl rounded-2xl">
           🗳️ دەنگدان دەست پێ بکە
         </button>
         <p className="text-white/20 text-xs text-center mt-3">
@@ -140,6 +131,13 @@ export default function Discuss() {
       </div>
     </main>
   )
+}
+
+function redirectToPhase(router, roomId, phase) {
+  if (phase === 'reveal') router.replace(`/room/${roomId}/reveal`)
+  else if (phase === 'vote') router.replace(`/room/${roomId}/vote`)
+  else if (phase === 'results') router.replace(`/room/${roomId}/results`)
+  else router.replace(`/room/${roomId}`)
 }
 
 function LoadingScreen() {
